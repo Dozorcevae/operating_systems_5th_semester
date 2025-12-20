@@ -8,7 +8,7 @@ int record_send(int sock_fd, const Record *rec){
 	//Protocol:
 	//DEPTH\tIS-LAST\tTYPE\tMODE_OCT\tRWX\tFLAGS\tNAMES\n
 	char line[1024];
-	int n = sprintf(line, sizeof(line), 
+	int n = snprintf(line, sizeof(line), 
 			"%d\t%d\t%c\t%o\t%s\t%s\n",
 			rec->depth,
 			rec->is_last,
