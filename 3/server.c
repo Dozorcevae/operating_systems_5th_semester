@@ -168,7 +168,7 @@ int main(void){
 				if (depth == 0) {
 					printf("%s", name);
 				} else {
-					printf("%s %s", is_last ? "`--" : "|--", name);
+					printf("%s %s", is_last ? "└──" : "├──", name);
 				}
 
 				//Type marker
