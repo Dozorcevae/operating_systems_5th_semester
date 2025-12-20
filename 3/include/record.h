@@ -6,7 +6,7 @@ typeof struct{
 	char type;		 //D/F/L/O
 	unsigned mode_oct;	 //0..0777
 	char rwx[4];		 // "rwx"
-	char flags[16]		 // e.g. "!*S"
+	char flags[16];		 // e.g. "!*S"
 	char name[256];		 // sinitized
 } Record;
 
