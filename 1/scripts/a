@@ -1,0 +1,18 @@
+#!/bin/bash
+if [ $# -ne 2 ]; then
+	echo "Usage: $0 <string1> <string2>"
+	exit 1
+fi
+
+s1=$1
+s2=$2
+
+echo "Script name: $0"
+echo "Parametr 1: $s1"
+echo "Parametr 2: $s2"
+
+if [ "$s1" = "$s2" ]; then
+	echo "The strings are equal."
+else
+	echo "The strings are not equal."
+fi

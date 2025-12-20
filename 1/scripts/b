@@ -1,0 +1,24 @@
+#!/bin/bash
+if [ $# -ne 2 ]; then
+	echo "Usage: $0 <number 1>, <number 2>"
+	exit 1
+fi
+
+n1=$1
+n2=$2
+
+if ! [[ "$n1" =~ ^-?[0-9]+$ ]] || ! [[ "$n2" =~ ^-?[0-9]+$ ]]; then
+	echo "Error: both parametrs must be integers"
+	exit 1
+fi
+
+echo "Parameter 1: $n1"
+echo "Parameter 2: $n2"
+
+if [ "$n1" -gt "$n2" ]; then
+	echo "Maximum: $n1"
+elif [ "$n2" -gt "$n1" ]; then
+	echo "Maximum: $n2"
+else
+	echo "Both parameters are equal: $n1"
+fi

@@ -1,0 +1,21 @@
+# Binaries
+client
+server
+
+# Build artifacts
+*.o
+*.a
+*.so
+
+# Debug / core
+core
+vgcore.*
+
+# UNIX sockers
+*.sock
+lab3.sock
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
