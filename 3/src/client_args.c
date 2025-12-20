@@ -12,12 +12,11 @@ void print_usage(const char *argv0){
 			" --max-depth	8\n"
 			" --max-nodes	8000\n"
 			" --sock	/tmp/Lab_3_audit_tree.sock\n",
-			argv0
-	       );
+			argv0);
 }
 
 int parse_args(int argc, char **argv, ClientConfig *cfg) {
-	for (int i - 1; i < argc; i++){
+	for (int i = 1; i < argc; i++){
 		if (strcmp(argv[i], "--root") == 0 && (i + 1) < argc){
 			cfg -> root = argv[++i];
 		}else if (strcmp(argv[i], "--max-depth") == 0 && (i + 1) < argc){
