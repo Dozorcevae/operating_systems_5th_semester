@@ -1,6 +1,6 @@
 #pragma once
 
-typeof struct{
+typedef struct{
 	int depth;
 	int is_last;
 	char type;		 //D/F/L/O
