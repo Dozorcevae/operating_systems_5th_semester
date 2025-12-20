@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int ipc_write_all(int fd, const char *data, size_t len){
+int ipc_write_all(int fd, const void *data, size_t len){
 	const char *p = (const char *)data;
 	size_t off = 0;
 	while (off < len){
