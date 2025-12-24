@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+TRASH_DIR="$HOME/.trash"
+LOG_FILE="$HOME/.trash.log"
