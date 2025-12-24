@@ -11,18 +11,29 @@ void print_usage(const char *argv0){
 			" --root	$HOME\n"
 			" --max-depth	8\n"
 			" --max-nodes	8000\n"
-			" --sock	/tmp/Lab_3_audit_tree.sock\n",
+			" --sock	/tmp/lab_3_audit_tree.sock\n",
 			argv0);
 }
 
 int parse_args(int argc, char **argv, ClientConfig *cfg) {
+	char *end = NULL;
 	for (int i = 1; i < argc; i++){
 		if (strcmp(argv[i], "--root") == 0 && (i + 1) < argc){
 			cfg -> root = argv[++i];
 		}else if (strcmp(argv[i], "--max-depth") == 0 && (i + 1) < argc){
-			cfg -> max_depth = atoi(argv[++i]);
+			long value = strtol(argv[++i], &end, 10);
+			if (!end || *end != '\0' || value <= 0) {
+				print_usage(argv[0]);
+				return 0;
+			}
+			cfg -> max_depth = (int)value;
 		}else if (strcmp(argv[i], "--max-nodes") == 0 && (i + 1) < argc){
-			cfg -> max_nodes = atoi(argv[++i]);
+			long value = strtol(argv[++i], &end, 10);
+			if (!end || *end != '\0' || value <= 0) {
+				print_usage(argv[0]);
+				return 0;
+			}
+			cfg -> max_nodes = (int)value;
 		}else if (strcmp(argv[i], "--sock") == 0 && (i + 1) < argc){
 			cfg -> sock_path = argv[++i];
 		}else{
@@ -32,4 +43,3 @@ int parse_args(int argc, char **argv, ClientConfig *cfg) {
 	}
 	return 1;
 }
-
