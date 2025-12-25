@@ -56,6 +56,4 @@ echo "$ID - $ABS_PATH" >> "$LOG_FILE" 2>/dev/null || {
 }
 
 echo "OK: moved '$SRC_NAME' to trash with id=$ID"
-EOF
 
-chmod +x remftrash
