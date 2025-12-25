@@ -2,3 +2,66 @@
 
 TRASH_DIR="$HOME/.trash"
 LOG_FILE="$HOME/.trash.log"
+
+usage() {
+    echo "Usage: $0 <filename_in_current_directory>"
+}
+
+# 1) Check for correct number of arguments
+if [ "$#" -ne 1 ]; then
+    usage
+    exit 1
+fi
+
+SRC_NAME="$1"
+
+# 2) Check if the file exists in the current directory
+if [ ! -e "$SRC_NAME" ]; then
+    echo "Error: File '$SRC_NAME' not found in current directory."
+    exit 1
+fi
+
+if [ ! -f "$SRC_NAME" ]; then
+    echo "Error: '$SRC_NAME' is not a regular file."
+    exit 1
+fi
+
+# 3) Create ~/.trash if it doesn't exist
+if [ ! -d "$TRASH_DIR" ]; then
+  mkdir -p "$TRASH_DIR" 2>/dev/null || { echo "Error: cannot create $TRASH_DIR"; exit 1; }
+fi
+
+# 4) Получить абсолютный путь исходного файла
+# realpath есть в Fedora. Если вдруг нет — можно заменить на readlink -f
+ABS_PATH="$(realpath "$SRC_NAME" 2>/dev/null)"
+if [ -z "$ABS_PATH" ]; then
+  echo "Error: cannot resolve absolute path for '$SRC_NAME'."
+  exit 1
+fi
+
+# 5) Unique ID generation
+ID=1
+while [ -e "$TRASH_DIR/$ID" ]; do
+  ID=$((ID + 1))
+done
+
+# 6) Make a hard link in the trash directory
+ln "$SRC_NAME" "$TRASH_DIR/$ID" 2>/dev/null || { echo "Error: cannot create hard link (ln)."; exit 1; }
+
+# 7) Delete the original file
+rm -f -- "$SRC_NAME" 2>/dev/null || {
+  # if rm fails, remove the hard link we just created
+  rm -f -- "$TRASH_DIR/$ID" 2>/dev/null
+  echo "Error: cannot remove original file."
+  exit 1
+}
+
+# 8) Write to the log file
+# log file format: ID - ABSOLUTE_PATH
+echo "$ID - $ABS_PATH" >> "$LOG_FILE" 2>/dev/null || {
+  echo "Warning: cannot write to log '$LOG_FILE' (file moved to trash anyway)."
+}
+
+echo "OK: moved '$SRC_NAME' to trash with id=$ID"
+exit 0
+

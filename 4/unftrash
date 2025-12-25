@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+TRASH_DIR="$HOME/.trash"
+LOG_FILE="$HOME/.trash.log"
+
+usage() {
+  echo "Usage: $0 <filename_only>"
+}
+
+if [ $# -ne 1 ]; then
+  usage
+  exit 1
+fi
+
+TARGET_NAME="$1"
+
+if [ ! -d "$TRASH_DIR" ] || [ ! -f "$LOG_FILE" ]; then
+  echo "Error: trash is empty or not initialized ($TRASH_DIR / $LOG_FILE not found)."
+  exit 1
+fi
+
+FOUND=0
+TMP_LOG="$(mktemp 2>/dev/null)"
+if [ -z "$TMP_LOG" ]; then
+  echo "Error: cannot create temp file."
+  exit 1
+fi
+
+# Считаем лог построчно, формат: "<id> - <abs_path>"
+# Важно: не печатаем ошибки команд — stderr подавляем.
+while IFS= read -r LINE; do
+  # пропускаем пустые строки
+  [ -z "$LINE" ] && continue
+
+  ID="${LINE%% - *}"
+  PATH_PART="${LINE#* - }"
+
+  # если формат битый — просто перенесём строку дальше
+  if [ -z "$ID" ] || [ -z "$PATH_PART" ] || [ "$ID" = "$LINE" ]; then
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  BASE_NAME="$(basename -- "$PATH_PART" 2>/dev/null)"
+  if [ "$BASE_NAME" != "$TARGET_NAME" ]; then
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  # Совпадение по имени
+  FOUND=1
+  echo "Found: id=$ID, original_path=$PATH_PART"
+  printf "Restore this file? (y/n): "
+  read -r ANS
+
+  if [ "$ANS" != "y" ] && [ "$ANS" != "Y" ]; then
+    # пользователь отказался — строку оставляем в логе
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  # Проверить, что файл реально есть в корзине
+  if [ ! -e "$TRASH_DIR/$ID" ]; then
+    echo "Error: trash object '$TRASH_DIR/$ID' not found. Skipping."
+    # строку оставляем (или можно убрать — но безопаснее оставить)
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  DEST_DIR="$(dirname -- "$PATH_PART" 2>/dev/null)"
+  DEST_PATH="$PATH_PART"
+
+  # Если каталога назначения нет — восстанавливаем в HOME
+  if [ ! -d "$DEST_DIR" ]; then
+    DEST_PATH="$HOME/$TARGET_NAME"
+    echo "Note: original directory missing, restoring to: $DEST_PATH"
+  fi
+
+  # Если файл уже существует — чтобы не перетирать молча, добавим суффикс
+  if [ -e "$DEST_PATH" ]; then
+    DEST_PATH="$DEST_PATH.restored_$ID"
+    echo "Note: destination exists, restoring as: $DEST_PATH"
+  fi
+
+  # Восстановление: создаём жёсткую ссылку обратно
+  ln "$TRASH_DIR/$ID" "$DEST_PATH" 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "Error: cannot restore (ln failed)."
+    # строку оставляем в логе
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  # Удаляем объект из корзины
+  rm -f -- "$TRASH_DIR/$ID" 2>/dev/null
+
+  echo "OK: restored to $DEST_PATH"
+  # строку НЕ записываем обратно в TMP_LOG (т.е. удаляем из лога)
+done < "$LOG_FILE"
+
+# Перезаписать лог
+mv -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || {
+  echo "Warning: cannot update log file. Temp log: $TMP_LOG"
+  exit 1
+}
+
+if [ $FOUND -eq 0 ]; then
+  echo "No entries found for name '$TARGET_NAME'."
+fi
+
+exit 0
