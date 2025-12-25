@@ -3,65 +3,105 @@
 TRASH_DIR="$HOME/.trash"
 LOG_FILE="$HOME/.trash.log"
 
-usage() {
-    echo "Usage: $0 <filename_in_current_directory>"
-}
+usage() { echo "Usage: $0 <filename_only>"; }
 
-# 1) Check for correct number of arguments
-if [ "$#" -ne 1 ]; then
-    usage
-    exit 1
-fi
-
-SRC_NAME="$1"
-
-# 2) Check if the file exists in the current directory
-if [ ! -e "$SRC_NAME" ]; then
-    echo "Error: File '$SRC_NAME' not found in current directory."
-    exit 1
-fi
-
-if [ ! -f "$SRC_NAME" ]; then
-    echo "Error: '$SRC_NAME' is not a regular file."
-    exit 1
-fi
-
-# 3) Create ~/.trash if it doesn't exist
-if [ ! -d "$TRASH_DIR" ]; then
-  mkdir -p "$TRASH_DIR" 2>/dev/null || { echo "Error: cannot create $TRASH_DIR"; exit 1; }
-fi
-
-# 4) Получить абсолютный путь исходного файла
-# realpath есть в Fedora. Если вдруг нет — можно заменить на readlink -f
-ABS_PATH="$(realpath "$SRC_NAME" 2>/dev/null)"
-if [ -z "$ABS_PATH" ]; then
-  echo "Error: cannot resolve absolute path for '$SRC_NAME'."
+if [ $# -ne 1 ]; then
+  usage
   exit 1
 fi
 
-# 5) Unique ID generation
-ID=1
-while [ -e "$TRASH_DIR/$ID" ]; do
-  ID=$((ID + 1))
+TARGET_NAME="$1"
+
+if [ ! -d "$TRASH_DIR" ] || [ ! -f "$LOG_FILE" ]; then
+  echo "Error: trash is empty or not initialized ($TRASH_DIR / $LOG_FILE not found)."
+  exit 1
+fi
+
+TMP_LOG="$(mktemp 2>/dev/null)"
+if [ -z "$TMP_LOG" ]; then
+  echo "Error: cannot create temp file."
+  exit 1
+fi
+
+FOUND=0
+
+# Открываем лог на отдельном файловом дескрипторе 3,
+# чтобы stdin оставался терминалом (меню/пользовательский ввод).
+exec 3< "$LOG_FILE"
+
+while IFS= read -r LINE <&3; do
+  [ -z "$LINE" ] && continue
+
+  ID="${LINE%% - *}"
+  PATH_PART="${LINE#* - }"
+
+  # если формат строки "битый" — оставляем как есть
+  if [ -z "$ID" ] || [ -z "$PATH_PART" ] || [ "$ID" = "$LINE" ]; then
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  BASE_NAME="$(basename -- "$PATH_PART" 2>/dev/null)"
+  if [ "$BASE_NAME" != "$TARGET_NAME" ]; then
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  FOUND=1
+  echo "Found: id=$ID, original_path=$PATH_PART"
+
+  # ВАЖНО: читаем ответ пользователя из терминала
+  printf "Restore this file? (y/n): " > /dev/tty
+  read -r ANS < /dev/tty
+
+  if [ "$ANS" != "y" ] && [ "$ANS" != "Y" ]; then
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  if [ ! -e "$TRASH_DIR/$ID" ]; then
+    echo "Error: trash object '$TRASH_DIR/$ID' not found. Skipping."
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  DEST_DIR="$(dirname -- "$PATH_PART" 2>/dev/null)"
+  DEST_PATH="$PATH_PART"
+
+  if [ ! -d "$DEST_DIR" ]; then
+    DEST_PATH="$HOME/$TARGET_NAME"
+    echo "Note: original directory missing, restoring to: $DEST_PATH"
+  fi
+
+  if [ -e "$DEST_PATH" ]; then
+    DEST_PATH="$DEST_PATH.restored_$ID"
+    echo "Note: destination exists, restoring as: $DEST_PATH"
+  fi
+
+  ln "$TRASH_DIR/$ID" "$DEST_PATH" 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "Error: cannot restore (ln failed)."
+    echo "$LINE" >> "$TMP_LOG" 2>/dev/null
+    continue
+  fi
+
+  rm -f -- "$TRASH_DIR/$ID" 2>/dev/null
+  echo "OK: restored to $DEST_PATH"
+  # строку из лога НЕ возвращаем (удаляем)
 done
 
-# 6) Make a hard link in the trash directory
-ln "$SRC_NAME" "$TRASH_DIR/$ID" 2>/dev/null || { echo "Error: cannot create hard link (ln)."; exit 1; }
+exec 3<&-
 
-# 7) Delete the original file
-rm -f -- "$SRC_NAME" 2>/dev/null || {
-  # if rm fails, remove the hard link we just created
-  rm -f -- "$TRASH_DIR/$ID" 2>/dev/null
-  echo "Error: cannot remove original file."
+mv -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || {
+  echo "Warning: cannot update log file. Temp log: $TMP_LOG"
   exit 1
 }
 
-# 8) Write to the log file
-# log file format: ID - ABSOLUTE_PATH
-echo "$ID - $ABS_PATH" >> "$LOG_FILE" 2>/dev/null || {
-  echo "Warning: cannot write to log '$LOG_FILE' (file moved to trash anyway)."
-}
+if [ $FOUND -eq 0 ]; then
+  echo "No entries found for name '$TARGET_NAME'."
+fi
 
-echo "OK: moved '$SRC_NAME' to trash with id=$ID"
 exit 0
+EOF
 
+chmod +x unftrash
