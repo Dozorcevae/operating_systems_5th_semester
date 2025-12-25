@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+
+SRC_DIR="$HOME/listtask"
+REPORT="$HOME/backup-report"
+
+# имя каталога бэкапа по МУ: Backup-YYYY-MM-DD
+TODAY="$(date +%F 2>/dev/null)"  # %F = YYYY-MM-DD
+if [ -z "$TODAY" ]; then
+  echo "Error: cannot get current date."
+  exit 1
+fi
+
+if [ ! -d "$SRC_DIR" ]; then
+  echo "Error: source directory '$SRC_DIR' not found. Create it and add files."
+  exit 1
+fi
+
+# Находим "действующий" каталог бэкапа: созданный не ранее 7 дней назад.
+# Делаем по имени даты в каталоге: Backup-YYYY-MM-DD
+ACTIVE_BACKUP=""
+ACTIVE_DATE_EPOCH=0
+
+NOW_EPOCH="$(date -d "$TODAY" +%s 2>/dev/null)"
+if [ -z "$NOW_EPOCH" ]; then
+  echo "Error: cannot compute epoch time."
+  exit 1
+fi
+
+# Порог: 7 дней назад
+THRESHOLD_EPOCH=$((NOW_EPOCH - 7*24*60*60))
+
+for D in "$HOME"/Backup-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]; do
+  [ ! -d "$D" ] && continue
+
+  DN="$(basename -- "$D" 2>/dev/null)"
+  DATE_PART="${DN#Backup-}"
+
+  EPOCH="$(date -d "$DATE_PART" +%s 2>/dev/null)"
+  [ -z "$EPOCH" ] && continue
+
+  # если дата >= порога, то это кандидат
+  if [ "$EPOCH" -ge "$THRESHOLD_EPOCH" ]; then
+    # выбираем самый свежий из "активных"
+    if [ "$EPOCH" -ge "$ACTIVE_DATE_EPOCH" ]; then
+      ACTIVE_DATE_EPOCH="$EPOCH"
+      ACTIVE_BACKUP="$D"
+    fi
+  fi
+done
+
+if [ -z "$ACTIVE_BACKUP" ]; then
+  # Создаём новый
+  ACTIVE_BACKUP="$HOME/Backup-$TODAY"
+  mkdir -p "$ACTIVE_BACKUP" 2>/dev/null || { echo "Error: cannot create backup directory."; exit 1; }
+
+  {
+    echo "Backup created: $(basename -- "$ACTIVE_BACKUP") date=$TODAY"
+    echo "Copied files:"
+  } >> "$REPORT" 2>/dev/null
+
+  # Копируем все обычные файлы из listtask
+  COPIED=0
+  for F in "$SRC_DIR"/*; do
+    [ ! -f "$F" ] && continue
+    NAME="$(basename -- "$F" 2>/dev/null)"
+    cp -f -- "$F" "$ACTIVE_BACKUP/$NAME" 2>/dev/null && {
+      echo "$NAME" >> "$REPORT" 2>/dev/null
+      COPIED=$((COPIED+1))
+    }
+  done
+
+  if [ $COPIED -eq 0 ]; then
+    echo "(no files)" >> "$REPORT" 2>/dev/null
+  fi
+
+  echo "OK: new backup created at $ACTIVE_BACKUP"
+  exit 0
+fi
+
+# Иначе: обновляем действующий
+{
+  echo "Backup updated: $(basename -- "$ACTIVE_BACKUP") date=$TODAY"
+} >> "$REPORT" 2>/dev/null
+
+ADDED_LINES=0
+VERSION_LINES=0
+
+# Правила копирования
+for F in "$SRC_DIR"/*; do
+  [ ! -f "$F" ] && continue
+  NAME="$(basename -- "$F" 2>/dev/null)"
+  DEST="$ACTIVE_BACKUP/$NAME"
+
+  if [ ! -f "$DEST" ]; then
+    cp -f -- "$F" "$DEST" 2>/dev/null && {
+      echo "ADDED $NAME" >> "$REPORT" 2>/dev/null
+      ADDED_LINES=$((ADDED_LINES+1))
+    }
+    continue
+  fi
+
+  SRC_SIZE="$(stat -c%s -- "$F" 2>/dev/null)"
+  DST_SIZE="$(stat -c%s -- "$DEST" 2>/dev/null)"
+
+  if [ -z "$SRC_SIZE" ] || [ -z "$DST_SIZE" ]; then
+    echo "Warning: cannot stat size for $NAME, skipping." >> "$REPORT" 2>/dev/null
+    continue
+  fi
+
+  if [ "$SRC_SIZE" -eq "$DST_SIZE" ]; then
+    # одинаковый размер — не копируем
+    continue
+  fi
+
+  # размеры разные — создаём версионную копию
+  VERSION_NAME="${NAME}.${TODAY}"
+  mv -f -- "$DEST" "$ACTIVE_BACKUP/$VERSION_NAME" 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "Warning: cannot version old file '$NAME'." >> "$REPORT" 2>/dev/null
+    continue
+  fi
+
+  cp -f -- "$F" "$DEST" 2>/dev/null
+  if [ $? -ne 0 ]; then
+    # если не смогли скопировать новый — попробуем вернуть старый назад
+    mv -f -- "$ACTIVE_BACKUP/$VERSION_NAME" "$DEST" 2>/dev/null
+    echo "Warning: cannot copy new '$NAME', restored previous version." >> "$REPORT" 2>/dev/null
+    continue
+  fi
+
+  echo "$NAME $VERSION_NAME" >> "$REPORT" 2>/dev/null
+  VERSION_LINES=$((VERSION_LINES+1))
+done
+
+echo "OK: backup updated at $ACTIVE_BACKUP"
+exit 0

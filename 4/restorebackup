@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+DEST_DIR="$HOME/listtask"
+TODAY="$(date +%F 2>/dev/null)"
+[ -z "$TODAY" ] && { echo "Error: cannot get date."; exit 1; }
+
+# Найти самый свежий каталог Backup-YYYY-MM-DD по дате в имени
+BEST_DIR=""
+BEST_EPOCH=0
+
+for D in "$HOME"/Backup-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]; do
+  [ ! -d "$D" ] && continue
+  DN="$(basename -- "$D" 2>/dev/null)"
+  DATE_PART="${DN#Backup-}"
+
+  EPOCH="$(date -d "$DATE_PART" +%s 2>/dev/null)"
+  [ -z "$EPOCH" ] && continue
+
+  if [ "$EPOCH" -ge "$BEST_EPOCH" ]; then
+    BEST_EPOCH="$EPOCH"
+    BEST_DIR="$D"
+  fi
+done
+
+if [ -z "$BEST_DIR" ]; then
+  echo "Error: no backup directories found (Backup-YYYY-MM-DD)."
+  exit 1
+fi
+
+# Убедиться, что listtask существует
+mkdir -p "$DEST_DIR" 2>/dev/null || { echo "Error: cannot create '$DEST_DIR'."; exit 1; }
+
+COPIED=0
+
+# Копируем всё, кроме версионных файлов *.YYYY-MM-DD
+for F in "$BEST_DIR"/*; do
+  [ ! -f "$F" ] && continue
+  NAME="$(basename -- "$F" 2>/dev/null)"
+
+  # исключаем версионные: заканчиваются на .YYYY-MM-DD
+  if echo "$NAME" | grep -Eq '\.[0-9]{4}-[0-9]{2}-[0-9]{2}$' 2>/dev/null; then
+    continue
+  fi
+
+  cp -f -- "$F" "$DEST_DIR/$NAME" 2>/dev/null && COPIED=$((COPIED+1))
+done
+
+echo "OK: restored $COPIED file(s) from $(basename -- "$BEST_DIR") into $DEST_DIR"
+exit 0
