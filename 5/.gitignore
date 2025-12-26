@@ -1,0 +1,67 @@
+5/block_diagram/
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# --- Python (flowchart scripts) ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# pip / build artifacts
+build/
+dist/
+*.egg-info/
+
+# --- Graphviz outputs ---
+*.png
+*.svg
+*.pdf
+*.dot
+
+# (specifically ignore diagram folders)
+5/block_diagram/
+4/flowchart/
+flowchart/
+block_diagram/
+
+# --- C/C++ build artifacts ---
+*.o
+*.a
+*.so
+*.out
+*.exe
+*.dSYM/
+
+# common binary names in labs
+generator
+handler
+a.out
+
+# --- Lab runtime files ---
+data.txt
+*.log
+.pid
+*.tmp
+*.swp
+*~
+
+# --- Archives ---
+*.zip
+*.tar
+*.tar.gz
+*.tgz
