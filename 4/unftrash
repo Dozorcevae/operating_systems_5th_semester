@@ -92,6 +92,3 @@ mv -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || { echo "Warning: cannot update log f
 if [ $FOUND -eq 0 ]; then
   echo "No entries found for name '$TARGET_NAME'."
 fi
-EOF
-
-chmod +x unftrash
