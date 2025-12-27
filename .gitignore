@@ -65,3 +65,9 @@ data.txt
 *.tar
 *.tar.gz
 *.tgz
+
+.DS_Store
+**/.DS_Store
+*.png
+*.svg
+*.pdf
